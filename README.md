@@ -17,3 +17,4 @@ main.go'
 * Better statistics reporting
 * Comments in TestExpectations
 * Expected failures (similar to v4's old runner)
+* Move v4's TestExpectations file somewhere more suitable

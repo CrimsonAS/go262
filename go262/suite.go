@@ -77,13 +77,14 @@ func RecursivelyWalk(pathName string) *GlobalState {
 
 	state.readExpectations()
 
-	filepath.Walk("./harness", state.walkHarnessIncludes)
+	filepath.Walk(pathName+"/harness", state.walkHarnessIncludes)
 
 	walkWrapper := func(pathName string, info os.FileInfo, err error) error {
 		return walkSuitesAndTests(state, pathName, info, err)
 	}
 
-	filepath.Walk(pathName, walkWrapper)
+	state.rootSuite = state.createSuiteIfNeeded(pathName)
+	filepath.Walk(pathName+"/test", walkWrapper)
 
 	suite := state.rootSuite
 	suite.parseRecursive()
@@ -145,9 +146,7 @@ func (global *GlobalState) createSuiteIfNeeded(pathName string) *TestSuite {
 	suite = &TestSuite{PathName: pathName, global: global}
 	global.suiteMap[pathName] = suite
 	//fmt.Printf("Creating new suite %s\n", pathName)
-	if global.rootSuite == nil {
-		global.rootSuite = suite
-	} else {
+	if global.rootSuite != nil {
 		// Find the suite to parent this suite to
 		parent := global.FetchSuite(path.Dir(pathName))
 		parent.Suites = append(parent.Suites, suite)

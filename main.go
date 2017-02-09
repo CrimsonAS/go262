@@ -28,6 +28,6 @@ import (
 )
 
 func main() {
-	state := Go262.RecursivelyWalk("./test")
+	state := Go262.RecursivelyWalk("./test262")
 	Go262Web.Serve(state)
 }
