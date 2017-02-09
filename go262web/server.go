@@ -31,6 +31,8 @@ import (
 	"log"
 	"net/http"
 	"path"
+	"strings"
+	"time"
 )
 
 // ### rewrite this stuff using templates
@@ -252,6 +254,8 @@ var testRunnerPool = Go262.NewWorkerPool()
 func runTestJobs(w http.ResponseWriter, jobs []*Go262.TestJob) {
 	notify := w.(http.CloseNotifier).CloseNotify()
 
+	startTime := time.Now()
+
 	// Create a new queue of jobs to run, push our jobs to it.
 	q := Go262.NewJobQueue(testRunnerPool)
 	go q.SendJobs(jobs)
@@ -263,17 +267,35 @@ func runTestJobs(w http.ResponseWriter, jobs []*Go262.TestJob) {
 		q.Cancel()
 	}()
 
-	// Read all finished results from the queue, and process them
+	io.WriteString(w, fmt.Sprintf("Running jobs, %d in queue...\n", len(jobs)))
 	for result := range q.ResultChannel {
-		io.WriteString(w, fmt.Sprintf("Job %s(type: %s) finished in %s, success: %t\n", result.TestCase.FileName(), result.RunType, result.ExecutionDuration.String(), result.IsSuccessful()))
 		if !result.IsSuccessful() {
-			//if result.TestCase.IsNegative() {
-			//	io.WriteString(w, fmt.Sprintf("### expected to fail in %s (with type %s), but didn't\n", result.TestCase.Metadata.Negative.Phase, result.TestCase.Metadata.Negative.Type))
-			//}
-			//io.WriteString(w, fmt.Sprintf("=== stderr ===\n%s\n", result.StderrOutput))
-			//io.WriteString(w, fmt.Sprintf("=== stdout ===\n%s\n", result.StdoutOutput))
+			io.WriteString(w, fmt.Sprintf(" * Job %s(type: %s) finished in %s unsuccessfully!\n", result.TestCase.FileName(), result.RunType, result.ExecutionDuration.String()))
+			if result.TestCase.IsNegative() {
+				io.WriteString(w, fmt.Sprintf("\t### expected to fail in %s (with type %s), but didn't\n", result.TestCase.Metadata.Negative.Phase, result.TestCase.Metadata.Negative.Type))
+			} else {
+				io.WriteString(w, fmt.Sprintf("\t### expected to pass, but failed\n"))
+			}
+			if len(result.StderrOutput) > 0 {
+				io.WriteString(w, "\t=== stderr ===\n")
+				for _, line := range strings.Split(result.StderrOutput, "\n") {
+					io.WriteString(w, "\t\t")
+					io.WriteString(w, line)
+					io.WriteString(w, "\n")
+				}
+			}
+			if len(result.StdoutOutput) > 0 {
+				io.WriteString(w, "\t=== stdout ===\n")
+				for _, line := range strings.Split(result.StdoutOutput, "\n") {
+					io.WriteString(w, "\t\t")
+					io.WriteString(w, line)
+					io.WriteString(w, "\n")
+				}
+			}
 		}
 	}
+
+	io.WriteString(w, fmt.Sprintf("All done! Took %s", time.Since(startTime).String()))
 }
 
 // /run/<path> handler
